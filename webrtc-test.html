@@ -1,0 +1,377 @@
+<!-- File: webrtc-test.html
+     Purpose: simple manual WebRTC ICE inspector + datachannel test suitable for GitHub Pages (HTTPS).
+     Usage: open same page in two browsers/devices and exchange SDP via copy-paste as described in UI.
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>WebRTC ICE Inspector</title>
+    <style>
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        margin: 18px;
+        background: #f7f9fb;
+        color: #111;
+      }
+      .col {
+        display: flex;
+        gap: 12px;
+      }
+      .panel {
+        background: white;
+        padding: 12px;
+        border-radius: 8px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+        flex: 1;
+      }
+      textarea {
+        width: 100%;
+        height: 160px;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: monospace;
+        font-size: 13px;
+      }
+      button {
+        margin: 6px 6px 6px 0;
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid #cbd5e1;
+        background: #fff;
+        cursor: pointer;
+      }
+      .badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: #eef2ff;
+        color: #3730a3;
+        font-size: 12px;
+        margin-left: 8px;
+      }
+      .candidate-host {
+        color: #0f5132;
+      }
+      .candidate-srflx {
+        color: #0f172a;
+      }
+      .candidate-relay {
+        color: #7f1d1d;
+      }
+      .status {
+        margin-top: 8px;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>WebRTC ICE Inspector (manual SDP exchange)</h2>
+    <p>
+      This page creates an RTCPeerConnection using a public STUN server and a
+      data channel. Use two browser windows/devices and exchange SDP manually
+      (copy/paste).
+    </p>
+
+    <div class="col">
+      <div class="panel" id="left">
+        <h3>Local / Actions</h3>
+        <div>
+          <button id="btnCreateOffer">Create Offer</button>
+          <button id="btnCopyLocal">Copy Local SDP</button>
+          <button id="btnSetRemote">Set Remote (offer/answer)</button>
+          <button id="btnCreateAnswer">Create Answer</button>
+        </div>
+
+        <div class="status" id="connStatus">
+          Connection: <span id="connState">new</span>
+        </div>
+        <div>ICE gathering: <span id="iceState">new</span></div>
+
+        <h4>Local SDP</h4>
+        <textarea
+          id="localSdp"
+          placeholder="local SDP will appear here after createOffer / createAnswer"
+        ></textarea>
+
+        <h4>Remote SDP (paste here)</h4>
+        <textarea
+          id="remoteSdp"
+          placeholder="paste remote SDP (offer or answer) here"
+        ></textarea>
+      </div>
+
+      <div class="panel" id="right">
+        <h3>ICE Candidates / Data Channel</h3>
+        <div>
+          <strong>ICE Candidates</strong>
+          <div id="candidates" style="margin-top: 8px"></div>
+        </div>
+
+        <h4>Data Channel</h4>
+        <div>
+          <input
+            id="msgText"
+            placeholder="message to send"
+            style="
+              width: 70%;
+              padding: 6px;
+              border-radius: 6px;
+              border: 1px solid #d1d5db;
+            "
+          />
+          <button id="sendBtn">Send</button>
+        </div>
+        <h4>Messages</h4>
+        <pre id="messages">no messages yet</pre>
+      </div>
+    </div>
+
+    <script>
+      // Configuration: use public STUN server(s)
+      const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+
+      // Global vars
+      let pc = null;
+      let dc = null;
+
+      // UI references
+      const btnCreateOffer = document.getElementById("btnCreateOffer");
+      const btnCreateAnswer = document.getElementById("btnCreateAnswer");
+      const btnCopyLocal = document.getElementById("btnCopyLocal");
+      const btnSetRemote = document.getElementById("btnSetRemote");
+      const localSdpTextarea = document.getElementById("localSdp");
+      const remoteSdpTextarea = document.getElementById("remoteSdp");
+      const candidatesDiv = document.getElementById("candidates");
+      const iceStateSpan = document.getElementById("iceState");
+      const connStateSpan = document.getElementById("connState");
+      const sendBtn = document.getElementById("sendBtn");
+      const msgText = document.getElementById("msgText");
+      const messagesPre = document.getElementById("messages");
+
+      function logMessage(text) {
+        messagesPre.textContent =
+          (messagesPre.textContent === "no messages yet"
+            ? ""
+            : messagesPre.textContent + "\n") + text;
+      }
+
+      function makePeerConnection() {
+        if (pc) {
+          pc.close();
+          pc = null;
+          dc = null;
+        }
+        pc = new RTCPeerConnection(config);
+
+        // connection state events
+        pc.onconnectionstatechange = () => {
+          connStateSpan.textContent = pc.connectionState;
+        };
+        pc.onicegatheringstatechange = () => {
+          iceStateSpan.textContent = pc.iceGatheringState;
+          if (pc.iceGatheringState === "complete") {
+            // update local SDP textarea with full SDP (with candidates)
+            if (pc.localDescription) {
+              localSdpTextarea.value = pc.localDescription.sdp;
+            }
+          }
+        };
+
+        // collect ICE candidates
+        pc.onicecandidate = (ev) => {
+          if (!ev.candidate) {
+            // ICE gathering finished (end-of-candidates)
+            appendCandidateText("[ICE] gathering finished (null candidate)");
+            return;
+          }
+          appendCandidate(ev.candidate);
+        };
+
+        // handle incoming datachannel (for the side that receives dc)
+        pc.ondatachannel = (ev) => {
+          dc = ev.channel;
+          setupDataChannel(dc);
+          appendCandidateText("[DATA] incoming datachannel: " + dc.label);
+        };
+
+        return pc;
+      }
+
+      function appendCandidate(cand) {
+        // cand is RTCIceCandidate
+        const text = cand.candidate;
+        // try to parse candidate type (typ host/srflx/relay)
+        let type = "unknown";
+        const m = text.match(/typ (host|srflx|relay)/);
+        if (m) type = m[1];
+        const el = document.createElement("div");
+        el.textContent = text;
+        if (type === "host") el.className = "candidate-host";
+        if (type === "srflx") el.className = "candidate-srflx";
+        if (type === "relay") el.className = "candidate-relay";
+        candidatesDiv.appendChild(el);
+      }
+
+      function appendCandidateText(text) {
+        const el = document.createElement("div");
+        el.textContent = text;
+        candidatesDiv.appendChild(el);
+      }
+
+      function setupDataChannel(channel) {
+        channel.onopen = () => appendCandidateText("[DATA] channel open");
+        channel.onclose = () => appendCandidateText("[DATA] channel closed");
+        channel.onmessage = (ev) => {
+          logMessage("RECV: " + ev.data);
+        };
+      }
+
+      // Create offer flow (caller)
+      btnCreateOffer.onclick = async () => {
+        makePeerConnection();
+        // create datachannel for caller role
+        dc = pc.createDataChannel("chat");
+        setupDataChannel(dc);
+
+        appendCandidateText("[ACTION] creating offer...");
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        // wait for ICE gathering to complete (or timeout)
+        await waitForIceGatheringComplete(pc, 5000);
+        localSdpTextarea.value = pc.localDescription.sdp;
+        appendCandidateText(
+          "[ACTION] offer created; ICE gathering state: " + pc.iceGatheringState
+        );
+      };
+
+      // Set remote description (can accept offer OR answer)
+      btnSetRemote.onclick = async () => {
+        const remote = remoteSdpTextarea.value.trim();
+        if (!remote) {
+          alert("Paste remote SDP into Remote SDP field first.");
+          return;
+        }
+        try {
+          const sdp = { type: detectSdpType(remote), sdp: remote };
+          if (!pc) makePeerConnection();
+          await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+          appendCandidateText(
+            "[ACTION] remote description set (" + sdp.type + ")"
+          );
+        } catch (err) {
+          alert("setRemote failed: " + err);
+        }
+      };
+
+      // Create answer from remote offer (callee)
+      btnCreateAnswer.onclick = async () => {
+        // assumes remote offer already pasted and set via Set Remote (or you set it programmatically)
+        if (!pc) makePeerConnection();
+        appendCandidateText("[ACTION] creating answer...");
+        try {
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          await waitForIceGatheringComplete(pc, 5000);
+          localSdpTextarea.value = pc.localDescription.sdp;
+          appendCandidateText(
+            "[ACTION] answer created; ICE gathering state: " +
+              pc.iceGatheringState
+          );
+        } catch (err) {
+          alert("createAnswer failed: " + err);
+        }
+      };
+
+      // copy local SDP easily
+      btnCopyLocal.onclick = async () => {
+        const text = localSdpTextarea.value;
+        if (!text) {
+          alert("Local SDP is empty.");
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(text);
+          alert("Local SDP copied to clipboard.");
+        } catch {
+          alert("Clipboard write failed. Copy manually.");
+        }
+      };
+
+      // helper: detect sdp type from its content
+      function detectSdpType(sdpText) {
+        if (
+          sdpText.includes("a=ice-ufrag") &&
+          sdpText.includes("a=ice-pwd") &&
+          sdpText.includes("a=group")
+        ) {
+          // can't reliably distinguish offer/answer by simple text; check for "a=setup:actpass" or "a=setup:active"
+        }
+        // fallback: ask user
+        const low = sdpText.slice(0, 100).toLowerCase();
+        if (low.includes("m=application") && low.includes("o=")) {
+          // heuristics: we'll prompt
+        }
+        // prompt user to choose (simple)
+        const t = prompt(
+          "Is this SDP an 'offer' or an 'answer'? Enter 'offer' or 'answer'",
+          "offer"
+        );
+        return t && t.toLowerCase() === "answer" ? "answer" : "offer";
+      }
+
+      // wait for ICE gathering complete or timeout ms
+      function waitForIceGatheringComplete(pc, timeoutMs) {
+        return new Promise((resolve) => {
+          if (pc.iceGatheringState === "complete") return resolve();
+          const onState = () => {
+            if (pc.iceGatheringState === "complete") {
+              pc.removeEventListener("icegatheringstatechange", onState);
+              resolve();
+            }
+          };
+          pc.addEventListener("icegatheringstatechange", onState);
+          setTimeout(() => {
+            pc.removeEventListener("icegatheringstatechange", onState);
+            resolve();
+          }, timeoutMs);
+        });
+      }
+
+      // detect SDP type helper removed reliance on server: will ask user if ambiguous
+      // Note: in manual copy/paste flow, the user should know if they pasted offer or answer.
+
+      // Send message via datachannel
+      sendBtn.onclick = () => {
+        if (!dc || dc.readyState !== "open") {
+          alert("Data channel is not open.");
+          return;
+        }
+        const text = msgText.value;
+        if (!text) return;
+        dc.send(text);
+        logMessage("SENT: " + text);
+        msgText.value = "";
+      };
+
+      // Small UX: auto-fill remoteSDP if user pastes SDP that looks like an offer/answer
+      remoteSdpTextarea.addEventListener("paste", (e) => {
+        // no-op, UI already has it
+      });
+
+      // For convenience, show a quick note
+      appendCandidateText(
+        "[INFO] This page uses STUN: stun.l.google.com:19302"
+      );
+      appendCandidateText(
+        "[INFO] Manual SDP exchange: Offer -> Answer copy/paste. Wait for ICE gathering to finish for full candidates."
+      );
+    </script>
+  </body>
+</html>
