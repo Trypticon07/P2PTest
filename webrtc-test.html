@@ -71,7 +71,7 @@
     </style>
   </head>
   <body>
-    <h2>WebRTC ICE Inspector (manual SDP exchange) v=1.5</h2>
+    <h2>WebRTC ICE Inspector (manual SDP exchange) v=1.6</h2>
     <p>
       This page creates an RTCPeerConnection using a public STUN server and a
       data channel. Use two browser windows/devices and exchange SDP manually
@@ -251,6 +251,32 @@
         );
       };
 
+      //   btnSetRemote.onclick = async () => {
+      //     let remote = remoteSdpTextarea.value;
+      //     if (!remote || !remote.trim()) {
+      //       alert("Paste remote SDP into Remote SDP field first.");
+      //       return;
+      //     }
+
+      //     // Only normalize line endings and trim whitespace
+      //     remote = remote.trim().replace(/\r\n/g, "\n");
+
+      //     try {
+      //       if (!pc) makePeerConnection();
+      //       const sdpType = detectSdpType(remote);
+      //       await pc.setRemoteDescription({ type: sdpType, sdp: remote });
+      //       appendCandidateText(
+      //         "[ACTION] remote description set (" + sdpType + ")"
+      //       );
+      //     } catch (err) {
+      //       alert("setRemote failed: " + err);
+      //     }
+      //   };
+      function sanitizeSdp(sdp) {
+        // remove a=max-message-size line safely
+        return sdp.replace(/^a=max-message-size:.*$/gm, "").trim();
+      }
+
       btnSetRemote.onclick = async () => {
         let remote = remoteSdpTextarea.value;
         if (!remote || !remote.trim()) {
@@ -258,8 +284,8 @@
           return;
         }
 
-        // Only normalize line endings and trim whitespace
-        remote = remote.trim().replace(/\r\n/g, "\n");
+        // sanitize SDP
+        remote = sanitizeSdp(remote).replace(/\r\n/g, "\n");
 
         try {
           if (!pc) makePeerConnection();
