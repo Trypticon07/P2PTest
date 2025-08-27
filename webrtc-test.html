@@ -71,7 +71,7 @@
     </style>
   </head>
   <body>
-    <h2>WebRTC ICE Inspector (manual SDP exchange) v=1.11</h2>
+    <h2>WebRTC ICE Inspector (manual SDP exchange) v=1.12</h2>
     <p>
       This page creates an RTCPeerConnection using a public STUN server and a
       data channel. Use two browser windows/devices and exchange SDP manually
@@ -167,12 +167,45 @@
           pc = null;
           dc = null;
         }
+
         pc = new RTCPeerConnection(config);
 
         // connection state events
         pc.onconnectionstatechange = () => {
+          console.log("Connection state changed:", pc.connectionState);
           connStateSpan.textContent = pc.connectionState;
+
+          if (pc.connectionState === "failed") {
+            console.warn(
+              "PeerConnection failed. Checking ICE candidate pairs..."
+            );
+            pc.getStats().then((stats) => {
+              stats.forEach((report) => {
+                if (report.type === "candidate-pair") {
+                  console.log("Candidate pair info:", report);
+                }
+                if (
+                  report.type === "local-candidate" ||
+                  report.type === "remote-candidate"
+                ) {
+                  console.log(report.type, report);
+                }
+              });
+            });
+          }
         };
+
+        // ICE connection state events
+        pc.oniceconnectionstatechange = () => {
+          console.log("ICE connection state:", pc.iceConnectionState);
+          if (pc.iceConnectionState === "failed") {
+            console.warn(
+              "ICE failed — likely no valid candidate pair could connect."
+            );
+          }
+        };
+
+        // ICE gathering state
         pc.onicegatheringstatechange = () => {
           iceStateSpan.textContent = pc.iceGatheringState;
           if (pc.iceGatheringState === "complete") {
