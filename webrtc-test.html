@@ -252,18 +252,40 @@
       };
 
       // Set remote description (can accept offer OR answer)
+      //   btnSetRemote.onclick = async () => {
+      //     const remote = remoteSdpTextarea.value.trim();
+      //     if (!remote) {
+      //       alert("Paste remote SDP into Remote SDP field first.");
+      //       return;
+      //     }
+      //     try {
+      //       const sdp = { type: detectSdpType(remote), sdp: remote };
+      //       if (!pc) makePeerConnection();
+      //       await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      //       appendCandidateText(
+      //         "[ACTION] remote description set (" + sdp.type + ")"
+      //       );
+      //     } catch (err) {
+      //       alert("setRemote failed: " + err);
+      //     }
+      //   };
+
       btnSetRemote.onclick = async () => {
-        const remote = remoteSdpTextarea.value.trim();
-        if (!remote) {
+        let remote = remoteSdpTextarea.value;
+        if (!remote || !remote.trim()) {
           alert("Paste remote SDP into Remote SDP field first.");
           return;
         }
+
+        // Clean SDP: remove extra whitespace and normalize line endings
+        remote = remote.trim().replace(/\r\n/g, "\n");
+
         try {
-          const sdp = { type: detectSdpType(remote), sdp: remote };
           if (!pc) makePeerConnection();
-          await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+          const sdpType = detectSdpType(remote);
+          await pc.setRemoteDescription({ type: sdpType, sdp: remote });
           appendCandidateText(
-            "[ACTION] remote description set (" + sdp.type + ")"
+            "[ACTION] remote description set (" + sdpType + ")"
           );
         } catch (err) {
           alert("setRemote failed: " + err);
