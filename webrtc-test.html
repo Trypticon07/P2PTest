@@ -71,7 +71,7 @@
     </style>
   </head>
   <body>
-    <h2>WebRTC ICE Inspector (manual SDP exchange) v=1.9</h2>
+    <h2>WebRTC ICE Inspector (manual SDP exchange) v=1.10</h2>
     <p>
       This page creates an RTCPeerConnection using a public STUN server and a
       data channel. Use two browser windows/devices and exchange SDP manually
@@ -251,72 +251,23 @@
         );
       };
 
-      // Set remote description (can accept offer OR answer)
-      //   btnSetRemote.onclick = async () => {
-      //     const remote = remoteSdpTextarea.value.trim();
-      //     if (!remote) {
-      //       alert("Paste remote SDP into Remote SDP field first.");
-      //       return;
-      //     }
-      //     //try {
-      //     const sdp = { type: detectSdpType(remote), sdp: remote };
-      //     if (!pc) makePeerConnection();
-      //     await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-      //     appendCandidateText(
-      //       "[ACTION] remote description set (" + sdp.type + ")"
-      //     );
-      //     //} catch (err) {
-      //     alert("setRemote failed: " + err);
-      //     //}
-      //   };
-
-      // helper: sanitize SDP before setRemoteDescription
-      function sanitizeSdp(sdp) {
-        // Normalize line endings and trim whitespace
-        sdp = sdp.replace(/\r\n/g, "\n").trim();
-
-        // Remove lone 'a=max-message-size' lines (some SDP parsers reject them)
-        // Keep everything else (do NOT remove a=sctp-port!)
-        sdp = sdp.replace(/^a=max-message-size:.*$/gm, "");
-
-        // Collapse accidental multiple blank lines introduced by removal
-        sdp = sdp.replace(/\n{2,}/g, "\n\n").trim();
-
-        return sdp;
-      }
-
+      //   Set remote description (can accept offer OR answer)
       btnSetRemote.onclick = async () => {
-        let remote = remoteSdpTextarea.value;
-        if (!remote || !remote.trim()) {
+        const remote = remoteSdpTextarea.value; //.trim()
+        if (!remote) {
           alert("Paste remote SDP into Remote SDP field first.");
           return;
         }
-
-        // sanitize SDP but preserve essential lines like a=sctp-port
-        remote = sanitizeSdp(remote);
-
-        try {
-          if (!pc) makePeerConnection();
-          const sdpType = detectSdpType(remote);
-
-          // Use the plain object form; modern browsers accept {type, sdp}
-          await pc.setRemoteDescription({ type: sdpType, sdp: remote });
-
-          appendCandidateText(
-            "[ACTION] remote description set (" + sdpType + ")"
-          );
-        } catch (err) {
-          // Log full details to console for debugging and show friendly alert
-          console.error(
-            "setRemoteDescription failed:",
-            err,
-            "\nSanitized SDP:\n",
-            remote
-          );
-          alert(
-            "setRemote failed: " + (err && err.message ? err.message : err)
-          );
-        }
+        //try {
+        const sdp = { type: detectSdpType(remote), sdp: remote };
+        if (!pc) makePeerConnection();
+        await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+        appendCandidateText(
+          "[ACTION] remote description set (" + sdp.type + ")"
+        );
+        //} catch (err) {
+        alert("setRemote failed: " + err);
+        //}
       };
 
       // Create answer from remote offer (callee)
