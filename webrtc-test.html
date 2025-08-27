@@ -71,7 +71,7 @@
     </style>
   </head>
   <body>
-    <h2>WebRTC ICE Inspector (manual SDP exchange) v=1.14</h2>
+    <h2>WebRTC ICE Inspector (manual SDP exchange) v=1.15</h2>
     <p>
       This page creates an RTCPeerConnection using a public STUN server and a
       data channel. Use two browser windows/devices and exchange SDP manually
@@ -181,31 +181,30 @@
         pc = new RTCPeerConnection(config);
 
         // connection state events
-        pc.onconnectionstatechange = () => {
-          console.log("Connection state changed:", pc.connectionState);
-          connStateSpan.textContent = pc.connectionState;
+        // pc.onconnectionstatechange = () => {
+        //   console.log("Connection state changed:", pc.connectionState);
+        //   connStateSpan.textContent = pc.connectionState;
 
-          if (pc.connectionState === "failed") {
-            console.warn(
-              "PeerConnection failed. Checking ICE candidate pairs..."
-            );
-            pc.getStats().then((stats) => {
-              stats.forEach((report) => {
-                if (report.type === "candidate-pair") {
-                  console.log("Candidate pair info:", report);
-                }
-                if (
-                  report.type === "local-candidate" ||
-                  report.type === "remote-candidate"
-                ) {
-                  console.log(report.type, report);
-                }
-              });
-            });
-          }
-        };
+        //   if (pc.connectionState === "failed") {
+        //     console.warn(
+        //       "PeerConnection failed. Checking ICE candidate pairs..."
+        //     );
+        //     pc.getStats().then((stats) => {
+        //       stats.forEach((report) => {
+        //         if (report.type === "candidate-pair") {
+        //           console.log("Candidate pair info:", report);
+        //         }
+        //         if (
+        //           report.type === "local-candidate" ||
+        //           report.type === "remote-candidate"
+        //         ) {
+        //           console.log(report.type, report);
+        //         }
+        //       });
+        //     });
+        //   }
+        // };
 
-        // ICE connection state events
         pc.onconnectionstatechange = async () => {
           console.log("Connection state changed:", pc.connectionState);
           if (pc.connectionState === "failed") {
@@ -221,6 +220,16 @@
                 }
               }
             });
+          }
+        };
+
+        // ICE connection state events
+        pc.oniceconnectionstatechange = () => {
+          console.log("ICE connection state:", pc.iceConnectionState);
+          if (pc.iceConnectionState === "failed") {
+            console.warn(
+              "ICE failed — likely no valid candidate pair could connect."
+            );
           }
         };
 
