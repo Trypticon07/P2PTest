@@ -71,7 +71,7 @@
     </style>
   </head>
   <body>
-    <h2>WebRTC ICE Inspector (manual SDP exchange) v=1.12</h2>
+    <h2>WebRTC ICE Inspector (manual SDP exchange) v=1.13</h2>
     <p>
       This page creates an RTCPeerConnection using a public STUN server and a
       data channel. Use two browser windows/devices and exchange SDP manually
@@ -134,7 +134,17 @@
 
     <script>
       // Configuration: use public STUN server(s)
-      const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+
+      const config = {
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          {
+            urls: "turn:YOUR_TURN_SERVER:3478",
+            username: "USER",
+            credential: "PASS",
+          },
+        ],
+      };
 
       // Global vars
       let pc = null;
