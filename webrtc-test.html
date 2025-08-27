@@ -71,7 +71,7 @@
     </style>
   </head>
   <body>
-    <h2>WebRTC ICE Inspector (manual SDP exchange) v=1.4</h2>
+    <h2>WebRTC ICE Inspector (manual SDP exchange) v=1.5</h2>
     <p>
       This page creates an RTCPeerConnection using a public STUN server and a
       data channel. Use two browser windows/devices and exchange SDP manually
@@ -251,25 +251,6 @@
         );
       };
 
-      // Set remote description (can accept offer OR answer)
-      //   btnSetRemote.onclick = async () => {
-      //     const remote = remoteSdpTextarea.value.trim();
-      //     if (!remote) {
-      //       alert("Paste remote SDP into Remote SDP field first.");
-      //       return;
-      //     }
-      //     try {
-      //       const sdp = { type: detectSdpType(remote), sdp: remote };
-      //       if (!pc) makePeerConnection();
-      //       await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-      //       appendCandidateText(
-      //         "[ACTION] remote description set (" + sdp.type + ")"
-      //       );
-      //     } catch (err) {
-      //       alert("setRemote failed: " + err);
-      //     }
-      //   };
-
       btnSetRemote.onclick = async () => {
         let remote = remoteSdpTextarea.value;
         if (!remote || !remote.trim()) {
@@ -277,7 +258,7 @@
           return;
         }
 
-        // Clean SDP: remove extra whitespace and normalize line endings
+        // Only normalize line endings and trim whitespace
         remote = remote.trim().replace(/\r\n/g, "\n");
 
         try {
